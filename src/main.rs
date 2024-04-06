@@ -1,5 +1,6 @@
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
+use serenity::model::mention::Mention;
 use serenity::FullEvent;
 
 struct Data {}
@@ -16,7 +17,7 @@ pub async fn avatar(
     let u = user.as_ref().unwrap_or_else(|| ctx.author());
 
     let embed = serenity::CreateEmbed::new()
-        .title(format!("@{}'s avatar", u.name))
+        .title(format!("{}'s avatar", Mention::from(u.id)))
         .image(u.face())
         .color(serenity::Colour::BLUE);
 
