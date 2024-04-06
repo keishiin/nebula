@@ -2,8 +2,14 @@ use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
 use serenity::model::mention::Mention;
 use serenity::FullEvent;
+use sqlx::PgPool;
 
-struct Data {}
+mod commands;
+
+struct Data {
+    pub db: PgPool,
+}
+
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
@@ -39,7 +45,6 @@ pub async fn age(
     Ok(())
 }
 
-/// Show this help menu
 #[poise::command(prefix_command, track_edits, slash_command)]
 pub async fn help(
     ctx: Context<'_>,
@@ -63,7 +68,10 @@ pub async fn help(
 async fn main() -> Result<(), Error> {
     dotenv().ok();
     let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
-    let intents = serenity::GatewayIntents::non_privileged();
+    let db_url = std::env::var("DATABASE_URL").expect("missing DATABASE_URL");
+
+    let intents =
+        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -81,7 +89,16 @@ async fn main() -> Result<(), Error> {
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {})
+
+                let pool = match PgPool::connect(&db_url).await {
+                    Ok(pool) => pool,
+                    Err(e) => {
+                        println!("Error connecting to db: {}", e);
+                        return Err(e.into());
+                    }
+                };
+
+                Ok(Data { db: pool })
             })
         })
         .build();
@@ -97,15 +114,66 @@ async fn main() -> Result<(), Error> {
 async fn event_handler(
     _ctx: &serenity::Context,
     event: &serenity::FullEvent,
-    _framework: poise::FrameworkContext<'_, Data, Error>,
+    framework: poise::FrameworkContext<'_, Data, Error>,
     _data: &Data,
 ) -> Result<(), Error> {
-    if let FullEvent::Ready { data_about_bot, .. } = event {
-        println!(
-            "Ready! Logged in as {}#{}",
-            data_about_bot.user.name,
-            data_about_bot.user.discriminator.unwrap()
-        );
+    match event {
+        FullEvent::Ready { data_about_bot, .. } => {
+            println!(
+                "Ready! Logged in as {}#{}",
+                data_about_bot.user.name,
+                data_about_bot.user.discriminator.unwrap()
+            );
+        }
+
+        FullEvent::Message { new_message } => {
+            println!("{}: {}", new_message.author.name, new_message.content);
+
+            let guild_id = new_message.guild_id.unwrap().to_string();
+            let user_id = new_message.author.id.to_string();
+
+            let db = &framework.user_data.db;
+
+            let res = sqlx::query!(
+                "
+                INSERT into leveling 
+                (user_id, guild_id, level, curr_exp, next_lvl)
+                VALUES ($1, $2, $3, $4, $5)
+                ",
+                user_id,
+                guild_id,
+                1,
+                0,
+                100
+            )
+            .execute(db)
+            .await?;
+
+            if res.rows_affected() == 1 {
+                println!("New user added to db");
+            }
+
+            let res2 = sqlx::query!(
+                "
+                UPDATE leveling
+                SET curr_exp = curr_exp + 10
+                WHERE user_id = $1 AND guild_id = $2
+                ",
+                user_id,
+                guild_id
+            )
+            .execute(db)
+            .await?
+            .rows_affected();
+
+            if res2 == 1 {
+                println!("Insertion successful!");
+            } else {
+                println!("Insertion failed!");
+            }
+        }
+
+        _ => {}
     }
     Ok(())
 }
