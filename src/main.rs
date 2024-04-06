@@ -2,8 +2,6 @@ use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
 use serenity::FullEvent;
 
-// mod misc_commands;
-
 struct Data {}
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -101,16 +99,12 @@ async fn event_handler(
     _framework: poise::FrameworkContext<'_, Data, Error>,
     _data: &Data,
 ) -> Result<(), Error> {
-    match event {
-        FullEvent::Ready { data_about_bot, .. } => {
-            println!(
-                "Ready! Logged in as {}#{}",
-                data_about_bot.user.name,
-                // Should never be None, as bots still use the "Name#0000" format instead of usernames
-                data_about_bot.user.discriminator.unwrap()
-            );
-        }
-        _ => {}
+    if let FullEvent::Ready { data_about_bot, .. } = event {
+        println!(
+            "Ready! Logged in as {}#{}",
+            data_about_bot.user.name,
+            data_about_bot.user.discriminator.unwrap()
+        );
     }
     Ok(())
 }
