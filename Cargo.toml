@@ -19,3 +19,7 @@ sqlx = { version = "0.7", features = [
 ] }
 poise = { git = "https://github.com/serenity-rs/poise" }
 tokio = { version = "1.21.2", features = ["full"] }
+
+
+[profile.release]
+opt-level = 3

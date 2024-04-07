@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.leveling
     level bigint,
     curr_exp bigint,
     next_lvl bigint,
+    msg_count bigint DEFAULT 0,
     CONSTRAINT leveling_pkey PRIMARY KEY (user_id)
 )
 ```
