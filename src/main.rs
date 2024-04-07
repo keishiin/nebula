@@ -1,11 +1,13 @@
-use ::serenity::all::Mentionable;
-use dotenv::dotenv;
-use poise::serenity_prelude as serenity;
-use serenity::model::mention::Mention;
-use serenity::FullEvent;
-use sqlx::PgPool;
+#![warn(clippy::str_to_string)]
 
 mod commands;
+
+use ::serenity::all::Mentionable;
+use commands::misc_commands::{age, avatar, help};
+use dotenv::dotenv;
+use poise::serenity_prelude as serenity;
+use serenity::FullEvent;
+use sqlx::PgPool;
 
 struct Data {
     pub db: PgPool,
@@ -13,57 +15,6 @@ struct Data {
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
-
-const _POKEURL: &str = "https://pokeapi.co/api/v2/pokemon/";
-
-#[poise::command(slash_command, prefix_command)]
-pub async fn avatar(
-    ctx: Context<'_>,
-    #[description = "users avatar"] user: Option<serenity::User>,
-) -> Result<(), Error> {
-    let u = user.as_ref().unwrap_or_else(|| ctx.author());
-
-    let embed = serenity::CreateEmbed::new()
-        .title(format!("{}'s avatar", Mention::from(u.id)))
-        .image(u.face())
-        .color(serenity::Colour::BLUE);
-
-    ctx.send(poise::CreateReply::default().embed(embed)).await?;
-
-    Ok(())
-}
-
-#[poise::command(slash_command, prefix_command)]
-pub async fn age(
-    ctx: Context<'_>,
-    #[description = "Selected user"] user: Option<serenity::User>,
-) -> Result<(), Error> {
-    let u = user.as_ref().unwrap_or_else(|| ctx.author());
-
-    let response = format!("@{}'s account was created at {}", u.name, u.created_at());
-    ctx.say(response).await?;
-
-    Ok(())
-}
-
-#[poise::command(prefix_command, track_edits, slash_command)]
-pub async fn help(
-    ctx: Context<'_>,
-    #[description = "Specific command to show help about"]
-    #[autocomplete = "poise::builtins::autocomplete_command"]
-    command: Option<String>,
-) -> Result<(), Error> {
-    poise::builtins::help(
-        ctx,
-        command.as_deref(),
-        poise::builtins::HelpConfiguration {
-            extra_text_at_bottom: "This is an example bot made to showcase features of my custom Discord bot framework",
-            ..Default::default()
-        },
-    )
-    .await?;
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -80,6 +31,7 @@ async fn main() -> Result<(), Error> {
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
+            on_error: |error| Box::pin(on_error(error)),
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),
                 case_insensitive_commands: true,
@@ -112,6 +64,20 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
+async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
+    match error {
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Command { error, ctx, .. } => {
+            println!("Error in command `{}`: {:?}", ctx.command().name, error);
+        }
+        error => {
+            if let Err(e) = poise::builtins::on_error(error).await {
+                println!("Error while handling erorr: {}", e);
+            }
+        }
+    }
+}
+
 async fn event_handler(
     ctx: &serenity::Context,
     event: &serenity::FullEvent,
@@ -125,6 +91,37 @@ async fn event_handler(
                 data_about_bot.user.name,
                 data_about_bot.user.discriminator.unwrap()
             );
+
+            let db = &framework.user_data.db;
+
+            let _ = sqlx::query!(
+                "
+                CREATE TABLE IF NOT EXISTS leveling (
+                    user_id VARCHAR NOT NULL,
+                    guild_id VARCHAR NOT NULL,
+                    level BIGINT,
+                    curr_exp BIGINT,
+                    next_lvl BIGINT,
+                    msg_count BIGINT DEFAULT 0,
+                    CONSTRAINT leveling_pkey PRIMARY KEY (user_id)
+                )"
+            )
+            .execute(db)
+            .await?;
+
+            let _ = sqlx::query!(
+                "
+                CREATE TABLE IF NOT EXISTS economy (
+                    user_id VARCHAR NOT NULL,
+                    guild_id VARCHAR NOT NULL,
+                    job VARCHAR,
+                    wallet BIGINT,
+                    bank BIGINT,
+                    CONSTRAINT ecnomy_pkey PRIMARY KEY (user_id, guild_id)
+                )"
+            )
+            .execute(db)
+            .await?;
         }
 
         FullEvent::Message { new_message } => {
@@ -189,7 +186,10 @@ async fn event_handler(
                             UPDATE leveling 
                             SET level = level + 1, curr_exp = 0, next_lvl = $1 
                             WHERE user_id = $2 AND guild_id = $3
-                            ", exp_next_level, user_id, guild_id
+                            ",
+                            exp_next_level,
+                            user_id,
+                            guild_id
                         )
                         .execute(db)
                         .await?;
