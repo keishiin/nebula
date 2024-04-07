@@ -1,22 +1,28 @@
 # nebula
 
-
+## Requirements
+```
+Rust 1.77.1
+Docker -> Running postgres
+```
 
 ## start postgres in docker
 ``` 
 docker run -p 5432:5432 --name some-postgres -e POSTGRES_PASSWORD=mysecretpassword -d postgres
 ```
-## create table 
+
+## Make the .env file
 ```
-CREATE TABLE IF NOT EXISTS public.leveling
-(
-    user_id character varying COLLATE pg_catalog."default" NOT NULL,
-    guild_id character varying COLLATE pg_catalog."default" NOT NULL,
-    level bigint,
-    curr_exp bigint,
-    next_lvl bigint,
-    msg_count bigint DEFAULT 0,
-    CONSTRAINT leveling_pkey PRIMARY KEY (user_id)
-)
+touch .env
 ```
 
+## Open the env file and add the following fields
+```
+DISCORD_TOKEN=your_bot_token
+DATABASE_URL=the_url_to_the_db_in_docker
+```
+
+## Start the bot
+```
+cargo run
+```
