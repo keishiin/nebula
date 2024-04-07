@@ -1,6 +1,5 @@
 use crate::{Context, Error};
 use poise::serenity_prelude as serenity;
-use serenity::model::mention::Mention;
 
 #[poise::command(slash_command, prefix_command)]
 pub async fn avatar(
@@ -10,7 +9,7 @@ pub async fn avatar(
     let u = user.as_ref().unwrap_or_else(|| ctx.author());
 
     let embed = serenity::CreateEmbed::new()
-        .title(format!("{}'s avatar", Mention::from(u.id)))
+        .title(format!("{}'s avatar", u.name))
         .image(u.face())
         .color(serenity::Colour::BLUE);
 

@@ -3,7 +3,7 @@
 mod commands;
 mod utils;
 
-use commands::economy::signup;
+use commands::economy::{bal, signup};
 use commands::misc_commands::{age, avatar, help};
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Error> {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![age(), help(), avatar(), signup()],
+            commands: vec![age(), help(), avatar(), signup(), bal()],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
             },
