@@ -1,7 +1,6 @@
-use ::serenity::all::{CacheHttp, Mentionable};
+use ::serenity::all::Mentionable;
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
-use serenity::http::Http;
 use serenity::model::mention::Mention;
 use serenity::FullEvent;
 use sqlx::PgPool;
@@ -186,12 +185,14 @@ async fn event_handler(
 
                         // need to update the users level and curr_exp == 0, next_lvl = exp_next_level
                         let _ = sqlx::query!(
-                    "
-                    UPDATE leveling SET level = level + 1, curr_exp = 0, next_lvl = $1 WHERE user_id = $2 AND guild_id = $3
-                    ", exp_next_level, user_id, guild_id
-                    )
-                    .execute(db)
-                    .await?;
+                            "
+                            UPDATE leveling 
+                            SET level = level + 1, curr_exp = 0, next_lvl = $1 
+                            WHERE user_id = $2 AND guild_id = $3
+                            ", exp_next_level, user_id, guild_id
+                        )
+                        .execute(db)
+                        .await?;
 
                         // send the msg informing the user that they have leveled up
                         // let http = ctx.http();
