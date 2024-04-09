@@ -165,7 +165,7 @@ pub async fn withdraw(
     let db = &ctx.data().db;
 
     let record = sqlx::query!(
-        "SELECT bank from economy WHERE user_id = $1 AND guild_id = $2",
+        "SELECT bank FROM economy WHERE user_id = $1 AND guild_id = $2",
         user.id.to_string(),
         guild.id.to_string()
     )
@@ -233,6 +233,149 @@ pub async fn daily(ctx: Context<'_>) -> Result<(), Error> {
     }
 
     ctx.say("$10000 added to your wallet").await?;
+
+    Ok(())
+}
+
+#[poise::command(slash_command)]
+pub async fn change_job(
+    ctx: Context<'_>,
+    #[description = "Select Job"] job: String,
+) -> Result<(), Error> {
+    let user = ctx.author();
+    let guild = ctx
+        .guild_id()
+        .unwrap()
+        .to_partial_guild(&ctx.http())
+        .await?;
+    let db = &ctx.data().db;
+    let jobs = &ctx.data().jobs;
+
+    let records = sqlx::query!(
+        "SELECT leveling.level AS level, economy.job AS job 
+        FROM leveling 
+        LEFT JOIN economy ON leveling.user_id = economy.user_id AND leveling.guild_id = economy.guild_id 
+        WHERE leveling.user_id = $1 AND leveling.guild_id = $2",
+        user.id.to_string(),
+        guild.id.to_string()
+    )
+    .fetch_one(db)
+    .await?;
+
+    let level = match records.level {
+        Some(level) => level,
+        None => {
+            ctx.say("You do not any level data").await?;
+            return Ok(());
+        }
+    };
+
+    let required_level = match jobs.get(job.as_str()) {
+        Some(level) => *level,
+        None => {
+            ctx.say("Invalid job entered").await?;
+            return Ok(());
+        }
+    };
+
+    if level >= required_level.0 {
+        let result = sqlx::query!(
+            "UPDATE economy SET job = $3 WHERE user_id = $1 AND guild_id = $2",
+            user.id.to_string(),
+            guild.id.to_string(),
+            job
+        )
+        .execute(db)
+        .await?
+        .rows_affected();
+
+        if result == 0 {
+            ctx.say("Unable able to change jobs").await?;
+            return Ok(());
+        }
+
+        ctx.say(format!("Job changed to {}", job)).await?;
+        return Ok(());
+    }
+
+    ctx.say("You do not meet the level requirement for this job")
+        .await?;
+
+    Ok(())
+}
+
+#[poise::command(slash_command)]
+pub async fn jobs(ctx: Context<'_>) -> Result<(), Error> {
+    let jobs_map = &ctx.data().jobs;
+
+    let mut description = String::new();
+    for (job, &(index, income)) in jobs_map {
+        description.push_str(&format!(
+            "Job: {} Level Required: {} Hourly Pay: {} \n",
+            job, index, income
+        ));
+    }
+
+    let embed = CreateEmbed::new()
+        .colour(Colour::BLUE)
+        .description(description);
+
+    ctx.send(CreateReply::default().embed(embed)).await?;
+
+    Ok(())
+}
+
+#[poise::command(slash_command)]
+pub async fn work(ctx: Context<'_>) -> Result<(), Error> {
+    let user = ctx.author();
+    let guild = ctx
+        .guild_id()
+        .unwrap()
+        .to_partial_guild(&ctx.http())
+        .await?;
+    let db = &ctx.data().db;
+    let jobs = &ctx.data().jobs;
+
+    let record = sqlx::query!(
+        "SELECT job FROM economy WHERE user_id = $1 AND guild_id = $2",
+        user.id.to_string(),
+        guild.id.to_string()
+    )
+    .fetch_one(db)
+    .await?;
+
+    let job = match record.job {
+        Some(job) => job,
+        None => {
+            ctx.say("You have no job selected").await?;
+            return Ok(());
+        }
+    };
+
+    let pay = match jobs.get(job.as_str()) {
+        Some(pay) => *pay,
+        None => {
+            ctx.say("Invalid job entered").await?;
+            return Ok(());
+        }
+    };
+
+    let result = sqlx::query!(
+        "UPDATE economy SET wallet = wallet + $3 WHERE user_id = $1 AND guild_id = $2",
+        user.id.to_string(),
+        guild.id.to_string(),
+        pay.1,
+    )
+    .execute(db)
+    .await?
+    .rows_affected();
+
+    if result == 0 {
+        ctx.say("Unable able to work").await?;
+        return Ok(());
+    }
+
+    ctx.say(format!("${} added to your wallet", pay.1)).await?;
 
     Ok(())
 }

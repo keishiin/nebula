@@ -3,15 +3,17 @@
 mod commands;
 mod utils;
 
-use commands::economy::{bal, daily, deposit, signup, withdraw};
+use commands::economy::{bal, change_job, daily, deposit, jobs, signup, withdraw, work};
 use commands::misc_commands::{age, avatar, help};
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
 use sqlx::PgPool;
+use std::collections::HashMap;
 use utils::{event_handler::event_handler, on_error::on_error};
 
 struct Data {
     pub db: PgPool,
+    pub jobs: HashMap<&'static str, (i64, i64)>,
 }
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
@@ -38,6 +40,9 @@ async fn main() -> Result<(), Error> {
                 bal(),
                 withdraw(),
                 deposit(),
+                change_job(),
+                jobs(),
+                work(),
                 daily(),
             ],
             event_handler: |ctx, event, framework, data| {
@@ -62,8 +67,31 @@ async fn main() -> Result<(), Error> {
                         return Err(e.into());
                     }
                 };
+                let jobs = [
+                    "Farmer",
+                    "Trader",
+                    "Craftsman",
+                    "Medic",
+                    "Engineer",
+                    "Teacher",
+                    "Entertainer",
+                    "Security Guard",
+                    "Chef",
+                    "Artist",
+                ];
+                let incomes = [
+                    5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000,
+                ];
 
-                Ok(Data { db: pool })
+                let mut job_map = HashMap::new();
+                for (index, job) in jobs.iter().enumerate() {
+                    job_map.insert(*job, ((index as i64) * 10, incomes[index]));
+                }
+
+                Ok(Data {
+                    db: pool,
+                    jobs: job_map,
+                })
             })
         })
         .build();
