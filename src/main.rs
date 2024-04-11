@@ -1,10 +1,9 @@
-#![warn(clippy::str_to_string)]
-
 mod commands;
 mod utils;
 
 use commands::economy::{bal, change_job, daily, deposit, jobs, signup, withdraw, work};
 use commands::misc_commands::{age, avatar, help};
+use commands::pokemon::{get_pokemon_by_name, get_random_pokemon};
 use dotenv::dotenv;
 use poise::serenity_prelude as serenity;
 use sqlx::PgPool;
@@ -44,6 +43,9 @@ async fn main() -> Result<(), Error> {
                 jobs(),
                 work(),
                 daily(),
+                // pokemon
+                get_random_pokemon(),
+                get_pokemon_by_name(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
