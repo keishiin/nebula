@@ -1,6 +1,42 @@
-use crate::Error;
+use crate::{Context, Error};
 use ::serenity::all::Mentionable;
+use ::serenity::all::Timestamp;
+use ::serenity::all::UserId;
 use poise::serenity_prelude as serenity;
+use poise::CreateReply;
+use serenity::Colour;
+use serenity::CreateEmbed;
+
+#[poise::command(slash_command)]
+pub async fn leaderboard(ctx: Context<'_>) -> Result<(), Error> {
+    let db = &ctx.data().db;
+    let mut description = String::new();
+    let users = sqlx::query!("SELECT * FROM leveling ORDER BY level DESC")
+        .fetch_all(db)
+        .await?;
+
+    for (i, user) in users.iter().enumerate() {
+        let user_id = UserId::from(user.user_id.parse::<u64>().unwrap());
+        description.push_str(&format!(
+            "{place}. **{name}** info: {level} -> {xp}xp / {exp_required}xp \n",
+            place = i + 1,
+            name = user_id.to_user(&ctx).await?.global_name.unwrap(),
+            level = user.level.unwrap_or(0),
+            xp = user.curr_exp.unwrap_or(0),
+            exp_required = user.next_lvl.map(|value| value + 100).unwrap_or(0)
+        ))
+    }
+
+    let embed = CreateEmbed::new()
+        .title("Leaderboard")
+        .description(description)
+        .timestamp(Timestamp::now())
+        .color(Colour::BLUE);
+
+    ctx.send(CreateReply::default().embed(embed)).await?;
+
+    Ok(())
+}
 
 pub async fn insert_or_update_leveling(
     db: &sqlx::PgPool,

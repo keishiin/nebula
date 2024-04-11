@@ -2,6 +2,7 @@ mod commands;
 mod utils;
 
 use commands::economy::{bal, change_job, daily, deposit, jobs, signup, withdraw, work};
+use commands::leveling::leaderboard;
 use commands::misc_commands::{age, avatar, help};
 use commands::pokemon::{get_pokemon_by_name, get_random_pokemon};
 use dotenv::dotenv;
@@ -46,6 +47,8 @@ async fn main() -> Result<(), Error> {
                 // pokemon
                 get_random_pokemon(),
                 get_pokemon_by_name(),
+                // leaderboard
+                leaderboard(),
             ],
             event_handler: |ctx, event, framework, data| {
                 Box::pin(event_handler(ctx, event, framework, data))
